@@ -606,10 +606,20 @@ function listenAISummary(){
   toast('✨','Ouvindo resumo da IA...');
 }
 
+// ── Text cleaning — fix spaced letters from PDF ──
+function cleanText(text){
+  // Fix words split into individual letters: "h e l l o" -> "hello"
+  text = text.replace(/(?<!\w)((\w\s){2,}\w)(?!\w)/g, match => match.replace(/\s/g,''));
+  // Fix extra spaces
+  text = text.replace(/\s+/g,' ').trim();
+  // Fix line breaks in middle of sentences
+  text = text.replace(/([a-záàãâéêíóõôúç])\n([a-záàãâéêíóõôúç])/gi, '$1 $2');
+  return text;
+}
+
 // Speak using ElevenLabs if key available, else Web Speech
 async function speakText(text){
-  // Always try ElevenLabs via server function first
-  await speakElevenLabs(text);
+  await speakElevenLabs(cleanText(text));
 }
 
 async function speakElevenLabs(text){
@@ -620,8 +630,13 @@ async function speakElevenLabs(text){
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, speed })
     });
-    if(!res.ok){ throw new Error('TTS error: '+res.status); }
+    if(!res.ok){
+      const errText = await res.text();
+      console.error('TTS HTTP error:', res.status, errText);
+      throw new Error('TTS error: '+res.status);
+    }
     const blob=await res.blob();
+    if(blob.size < 100){ throw new Error('Audio vazio — verifique a chave ElevenLabs'); }
     const url=URL.createObjectURL(blob);
     if(elevenAudio){elevenAudio.pause();URL.revokeObjectURL(elevenAudio.src);}
     elevenAudio=new Audio(url);
@@ -641,12 +656,13 @@ async function speakElevenLabs(text){
     if(isMobile) document.getElementById('mobile-bar').classList.add('show');
   }catch(err){
     console.error('ElevenLabs error:',err);
-    toast('⚠️','Usando voz do navegador — verifique sua chave ElevenLabs.');
+    toast('⚠️','Voz ElevenLabs indisponível — usando voz do navegador.');
     speakWebSpeech(text);
   }
 }
 
 function speakWebSpeech(text){
+  text = cleanText(text);
   synth.cancel();
   utt=new SpeechSynthesisUtterance(text);
   utt.lang=document.getElementById('lang').value;
@@ -693,14 +709,13 @@ function stopAll(){
 
 function restart(){if(currentText){synth.cancel();utt=null;setTimeout(()=>startRead(currentText),80);}}
 
-// ── Skip forward/back (works for both Web Speech and ElevenLabs) ──
+// ── Skip forward/back ──
 function skip(seconds){
-  if(elevenAudio){
-    elevenAudio.currentTime = Math.max(0, elevenAudio.currentTime + seconds);
+  if(elevenAudio && elevenAudio.duration){
+    elevenAudio.currentTime = Math.max(0, Math.min(elevenAudio.currentTime + seconds, elevenAudio.duration));
     toast(seconds>0?'⏩':'⏪', `${Math.abs(seconds)}s`);
-  } else if(utt){
-    // Web Speech doesn't support seek — restart from approximate position
-    toast(seconds>0?'⏩':'⏪', `${Math.abs(seconds)}s`);
+  } else {
+    toast('ℹ️', seconds>0?'Avançando...':'Voltando...');
   }
 }
 
