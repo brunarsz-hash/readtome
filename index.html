@@ -550,9 +550,13 @@ function setSpd(s,btn){
   speed=s;
   document.querySelectorAll('.spd-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  // Apply immediately if playing
-  if(utt && playing){ synth.cancel(); setTimeout(()=>startRead(currentText),80); }
-  if(elevenAudio && playing){ toast('⚡','Velocidade aplicada na próxima reprodução.'); }
+  // Stop current audio and restart with new speed
+  if(playing && currentText){
+    if(elevenAudio){ elevenAudio.pause(); elevenAudio=null; }
+    synth.cancel();
+    setPlaying(false);
+    setTimeout(()=>startRead(currentText), 200);
+  }
 }
 
 // ── Waveform ──
