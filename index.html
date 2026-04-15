@@ -550,12 +550,14 @@ function setSpd(s,btn){
   speed=s;
   document.querySelectorAll('.spd-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  // Stop current audio and restart with new speed
-  if(playing && currentText){
+  // Stop current audio and restart with new speed via ElevenLabs
+  if(currentText){
     if(elevenAudio){ elevenAudio.pause(); elevenAudio=null; }
-    synth.cancel();
+    synth.cancel(); utt=null;
     setPlaying(false);
-    setTimeout(()=>startRead(currentText), 200);
+    if(playing || document.getElementById('player').classList.contains('show')){
+      setTimeout(()=>speakElevenLabs(currentText.substring(0,2500)), 300);
+    }
   }
 }
 
